@@ -1,15 +1,20 @@
-import numpy as np
+from typing import cast
+
+import hpelm  # High-Performance ELM
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 from sklearn import datasets
+from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix, accuracy_score
-import hpelm  # High-Performance ELM
+from sklearn.utils import Bunch
 
 # Load dataset
-iris = datasets.load_iris()
-X, y = iris.data, iris.target
+iris: Bunch = cast(Bunch, datasets.load_iris())
+X = np.array(iris.data)  # Convert to numpy array explicitly
+y = np.array(iris.target)  # Convert to numpy array explicitly
+target_names = iris.target_names  # Store target names separately
 
 # Normalize features
 scaler = StandardScaler()
@@ -42,7 +47,7 @@ cm_percentage = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]  # Normalize
 # Create the figure
 plt.figure(figsize=(7, 5))
 sns.heatmap(cm_percentage, annot=True, fmt=".2%", cmap="coolwarm", linewidths=2, 
-            xticklabels=iris.target_names, yticklabels=iris.target_names)
+            xticklabels=target_names, yticklabels=target_names)
 
 # Improve readability
 plt.xlabel("Predicted Label", fontsize=12)

@@ -90,8 +90,8 @@ class CodeMathRepresentationTool(BaseTool):
         operands = len([n for n in ast.walk(tree) if isinstance(n, (ast.Name, ast.Num, ast.Str))])
         
         # Unique operators and operands (approximation)
-        unique_operators = len(set([type(n).__name__ for n in ast.walk(tree) if isinstance(n, (ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare))]))
-        unique_operands = len(set([getattr(n, 'id', str(n)) for n in ast.walk(tree) if isinstance(n, (ast.Name, ast.Num, ast.Str))]))
+    `        unique_operators = len(set([type(n).__name__ for n in ast.walk(tree) if isinstance(n, (ast.BinOp, ast.UnaryOp, ast.BoolOp, ast.Compare))]))
+`        unique_operands = len(set([getattr(n, 'id', str(n)) for n in ast.walk(tree) if isinstance(n, (ast.Name, ast.Num, ast.Str))]))
         
         # Halstead volume: N * log2(n) where N = operators + operands, n = unique_operators + unique_operands
         n = max(1, unique_operators + unique_operands)  # Prevent log(0)
@@ -226,7 +226,7 @@ class CodeMathRepresentationTool(BaseTool):
                 centrality = nx.degree_centrality(G)
                 metrics[f"{prefix}_max_centrality"] = max(centrality.values()) if centrality else 0
                 metrics[f"{prefix}_avg_centrality"] = sum(centrality.values()) / len(centrality) if centrality else 0
-            except:
+            except Exception:
                 metrics[f"{prefix}_max_centrality"] = 0
                 metrics[f"{prefix}_avg_centrality"] = 0
         else:
@@ -243,7 +243,7 @@ class CodeMathRepresentationTool(BaseTool):
                 eigenvalues = sorted(nx.linalg.adj_matrix(G).todense().real, reverse=True)[:3]
                 for i, val in enumerate(eigenvalues):
                     metrics[f"{prefix}_eigenvalue_{i}"] = float(val)
-            except:
+            except Exception:
                 metrics[f"{prefix}_eigenvalue_0"] = 0
                 metrics[f"{prefix}_eigenvalue_1"] = 0
                 metrics[f"{prefix}_eigenvalue_2"] = 0

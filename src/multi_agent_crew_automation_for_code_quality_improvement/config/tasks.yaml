@@ -1,0 +1,63 @@
+---
+analyze_task:
+  description: Analyze the code from {repo_url} using AST-based machine learning models
+    to detect bugs and compute metrics including cyclomatic complexity, Halstead Volume,
+    and Maintainability Index. Identify and flag code smells that exceed the threshold
+    {analysis_threshold}.
+  expected_output: A comprehensive report detailing potential bugs, structural issues,
+    and a prioritized list of code smells based on severity metrics.
+  async_execution: false
+  agent: analyzer
+refactor_task:
+  description: Based on the findings from the analysis task, refactor the code segments
+    in {project_name} by applying graph rewriting and search-based algorithms to extract
+    redundant logic and improve code modularity.
+  expected_output: A detailed refactoring plan and updated code segments that demonstrate
+    reduced redundancy and improved structure.
+  async_execution: false
+  agent: refactor
+  context:
+  - analyze_task
+test_task:
+  description: Execute targeted tests on the refactored code using the command {test_command}.
+    Focus on dependency-driven test selection and statistical coverage models to verify
+    functionality without unnecessary test runs.
+  expected_output: Test results including coverage metrics and identification of any
+    failing or high-risk areas post-refactoring.
+  async_execution: false
+  agent: test
+  context:
+  - refactor_task
+documentation_task:
+  description: Update the project documentation located at {doc_path} by generating
+    concise and clear summaries of the code changes and refactoring updates for {project_name}.
+    Utilize NLP-based extractive and abstractive summarization to produce developer-friendly
+    release notes.
+  expected_output: Updated documentation and release notes reflecting the recent changes
+    in the code, ensuring clarity and ease of understanding for future development.
+  async_execution: false
+  agent: documentation
+  context:
+  - refactor_task
+security_task:
+  description: Perform a security analysis using the configurations in {security_config}.
+    Apply risk scoring algorithms and anomaly detection to the code sections flagged
+    during analysis and refactoring, aiming to identify potential vulnerabilities.
+  expected_output: A comprehensive security report with risk ratings and actionable
+    recommendations to mitigate vulnerabilities.
+  async_execution: false
+  agent: security
+  context:
+  - analyze_task
+  - refactor_task
+performance_task:
+  description: Profile the refactored and tested code using performance metrics defined
+    in {performance_metrics}. Utilize adaptive sampling methods to identify bottlenecks
+    in CPU and memory usage and recommend targeted optimizations.
+  expected_output: A detailed performance report highlighting bottlenecks along with
+    optimization recommendations.
+  async_execution: false
+  agent: performance
+  context:
+  - refactor_task
+  - test_task

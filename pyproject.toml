@@ -1,0 +1,20 @@
+[project]
+name = "multi_agent_crew_automation_for_code_quality_improvement"
+version = "0.1.0"
+description = "multi_agent_crew_automation_for_code_quality_improvement using crewAI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10,<=3.13"
+dependencies = [
+    "crewai[tools]>=0.86.0,<1.0.0"
+]
+
+[project.scripts]
+multi_agent_crew_automation_for_code_quality_improvement = "multi_agent_crew_automation_for_code_quality_improvement.main:run"
+run_crew = "multi_agent_crew_automation_for_code_quality_improvement.main:run"
+train = "multi_agent_crew_automation_for_code_quality_improvement.main:train"
+replay = "multi_agent_crew_automation_for_code_quality_improvement.main:replay"
+test = "multi_agent_crew_automation_for_code_quality_improvement.main:test"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

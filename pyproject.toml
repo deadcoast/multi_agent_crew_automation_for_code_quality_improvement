@@ -2,7 +2,7 @@
 name = "multi_agent_crew_automation_for_code_quality_improvement"
 version = "0.1.0"
 description = "multi_agent_crew_automation_for_code_quality_improvement using crewAI"
-authors = [{ name = "Your Name", email = "you@example.com" }]
+authors = [{ name = "deadcoast", email = "you@example.com" }]
 requires-python = ">=3.10,<=3.13"
 dependencies = [
     "crewai[tools]>=0.86.0,<1.0.0"

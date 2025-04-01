@@ -1,6 +1,6 @@
 """
 Mathematical tools for enhancing code quality analysis and improvement.
-These tools implement various mathematical algorithms and techniques 
+These tools implement various mathematical algorithms and techniques
 as described in the Coding Crew Design documents.
 """
 
@@ -13,28 +13,17 @@ import numpy as np
 import radon.complexity as radon_cc
 import radon.metrics as radon_metrics
 import radon.raw as radon_raw
+
+# Import the real BaseTool from crewai.tools
+from crewai.tools import BaseTool
 from sklearn.cluster import DBSCAN, KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-try:
-    from crewai.tools import BaseTool
-except ImportError:
-    # Fallback implementation if crewai_tools is not available
-    class BaseTool:
-        """Base class for all tools."""
-        name: str = "BaseTool"
-        description: str = "Base class for all tools."
-        
-        def _run(self, *args, **kwargs) -> str:
-            raise NotImplementedError("Subclasses must implement this method")
-        
-        def run(self, *args, **kwargs) -> str:
-            return self._run(*args, **kwargs)
 
-
+# Now our custom tools will properly inherit from crewai.tools.BaseTool
 class CodeComplexityAnalysisTool(BaseTool):
     """Tool for analyzing code complexity using radon metrics."""
-    
+
     name: str = "Code Complexity Analysis Tool"
     description: str = """
     Analyzes Python code complexity using metrics such as:
@@ -49,83 +38,105 @@ class CodeComplexityAnalysisTool(BaseTool):
     def _run(self, file_patterns: str, limit: int = 10) -> str:
         """
         Analyze code complexity for the given file patterns.
-        
+
         Args:
             file_patterns: Glob patterns for Python files to analyze (comma-separated)
             limit: Maximum number of files to show in the results
-            
+
         Returns:
             A summary of complexity metrics for the most complex files
         """
         results = []
-        patterns = [p.strip() for p in file_patterns.split(',')]
-        
+        patterns = [p.strip() for p in file_patterns.split(",")]
+
         for pattern in patterns:
             for file_path in glob.glob(pattern, recursive=True):
-                if not file_path.endswith('.py'):
+                if not file_path.endswith(".py"):
                     continue
-                    
+
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         code = f.read()
-                        
+
                     # Calculate complexity metrics
                     cc_results = radon_cc.cc_visit(code)
                     mi = radon_metrics.mi_visit(code, multi=True)
                     raw_metrics = radon_raw.analyze(code)
-                    
+
                     # Calculate average complexity for the file
-                    avg_complexity = np.mean([r.complexity for r in cc_results]) if cc_results else 0
-                    
+                    avg_complexity = (
+                        np.mean([r.complexity for r in cc_results]) if cc_results else 0
+                    )
+
                     # Append results
-                    results.append({
-                        'file': file_path,
-                        'avg_complexity': avg_complexity,
-                        'maintainability_index': mi,
-                        'loc': raw_metrics.loc,
-                        'functions': len(cc_results),
-                        'comments_ratio': raw_metrics.comments / raw_metrics.loc if raw_metrics.loc > 0 else 0,
-                        'complexity_details': {r.name: r.complexity for r in cc_results}
-                    })
+                    results.append(
+                        {
+                            "file": file_path,
+                            "avg_complexity": avg_complexity,
+                            "maintainability_index": mi,
+                            "loc": raw_metrics.loc,
+                            "functions": len(cc_results),
+                            "comments_ratio": raw_metrics.comments / raw_metrics.loc
+                            if raw_metrics.loc > 0
+                            else 0,
+                            "complexity_details": {
+                                r.name: r.complexity for r in cc_results
+                            },
+                        }
+                    )
                 except Exception as e:
-                    results.append({
-                        'file': file_path,
-                        'error': str(e)
-                    })
-        
+                    results.append({"file": file_path, "error": str(e)})
+
         # Sort results by average complexity
-        sorted_results = sorted(results, key=lambda x: x.get('avg_complexity', 0), reverse=True)
+        sorted_results = sorted(
+            results, key=lambda x: x.get("avg_complexity", 0), reverse=True
+        )
         limited_results = sorted_results[:limit]
-        
+
         # Format the results
         output = "## Code Complexity Analysis Results\n\n"
         output += f"Analyzed {len(results)} Python files. Top {len(limited_results)} most complex files:\n\n"
-        
+
         for i, r in enumerate(limited_results, 1):
             output += f"### {i}. {r['file']}\n"
-            if 'error' in r:
+            if "error" in r:
                 output += f"Error: {r['error']}\n"
                 continue
-                
+
             output += f"- Average Cyclomatic Complexity: {r['avg_complexity']:.2f}\n"
             output += f"- Maintainability Index: {r['maintainability_index']:.2f}\n"
             output += f"- Lines of Code: {r['loc']}\n"
             output += f"- Number of Functions: {r['functions']}\n"
             output += f"- Comments Ratio: {r['comments_ratio']:.2f}\n"
-            
-            if r['complexity_details']:
+
+            if r["complexity_details"]:
                 output += "- Complex Functions:\n"
-                complex_funcs = sorted(r['complexity_details'].items(), key=lambda x: x[1], reverse=True)[:3]
+                complex_funcs = sorted(
+                    r["complexity_details"].items(), key=lambda x: x[1], reverse=True
+                )[:3]
                 for name, complexity in complex_funcs:
                     output += f"  - `{name}`: {complexity}\n"
-            
+
             output += "\n"
-        
+
         return output
 
+
 class DependencyGraphAnalysisTool(BaseTool):
-    """Tool for analyzing module dependencies using networkx."""
+    """Tool for analyzing module dependencies using networkx.
+
+    Analyzes Python module dependencies by:
+    - Building a directed graph of import relationships
+    - Identifying highly connected modules
+    - Detecting circular dependencies
+    - Suggesting potential refactoring opportunities
     
+    Requirements:
+        - networkx>=3.0: `pip install networkx>=3.0`  # Version 3.0+ required to avoid bugs
+        - numpy: `pip install numpy`
+        - matplotlib: `pip install matplotlib`
+    """
+
     name: str = "Dependency Graph Analysis Tool"
     description: str = """
     Analyzes Python module dependencies by:
@@ -138,10 +149,10 @@ class DependencyGraphAnalysisTool(BaseTool):
     def _run(self, directory: str) -> str:
         """
         Analyze dependencies between Python modules in the given directory.
-        
+
         Args:
             directory: Directory containing Python files to analyze
-            
+
         Returns:
             A summary of dependency analysis results
         """
@@ -154,15 +165,19 @@ class DependencyGraphAnalysisTool(BaseTool):
         # Process all Python files
         for root, _, files in os.walk(directory):
             for file in files:
-                if not file.endswith('.py'):
+                if not file.endswith(".py"):
                     continue
 
                 file_path = os.path.join(root, file)
-                module_name = os.path.relpath(file_path, directory).replace('/', '.').replace('\\', '.')[:-3]
+                module_name = (
+                    os.path.relpath(file_path, directory)
+                    .replace("/", ".")
+                    .replace("\\", ".")[:-3]
+                )
                 G.add_node(module_name)
 
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         code = f.read()
 
                     # Parse imports using AST
@@ -191,11 +206,24 @@ class DependencyGraphAnalysisTool(BaseTool):
         output += f"- Total dependencies: {G.number_of_edges()}\n"
 
         # 2. Identify highly connected modules (hubs)
-        in_degree = dict(G.in_degree())
-        out_degree = dict(G.out_degree())
+        # Manually convert in_degree and out_degree to avoid type errors
+        in_degree = {}
+        out_degree = {}
+        
+        for node in G.nodes():
+            in_degree[node] = G.in_degree(node)
+            out_degree[node] = G.out_degree(node)
 
-        top_imported = sorted(list(in_degree.items()), key=lambda x: x[1], reverse=True)[:5]
-        top_importers = sorted(list(out_degree.items()), key=lambda x: x[1], reverse=True)[:5]
+        # Create lists of tuples for sorting
+        in_degree_items = [(str(module), int(count)) for module, count in in_degree.items()]
+        out_degree_items = [(str(module), int(count)) for module, count in out_degree.items()]
+
+        top_imported = sorted(
+            in_degree_items, key=lambda x: x[1], reverse=True
+        )[:5]
+        top_importers = sorted(
+            out_degree_items, key=lambda x: x[1], reverse=True
+        )[:5]
 
         output += "\n### Most Imported Modules\n"
         for module, count in top_imported:
@@ -245,9 +273,10 @@ class DependencyGraphAnalysisTool(BaseTool):
 
         return output
 
+
 class CodeClusteringTool(BaseTool):
     """Tool for clustering similar code files using machine learning."""
-    
+
     name: str = "Code Clustering Tool"
     description: str = """
     Clusters Python files based on their similarity using ML techniques:
@@ -258,99 +287,104 @@ class CodeClusteringTool(BaseTool):
     Useful for identifying groups of related files for batch refactoring.
     """
 
-    def _run(self, file_patterns: str, n_clusters: int = 5, algorithm: str = "kmeans") -> str:
+    def _run(
+        self, file_patterns: str, n_clusters: int = 5, algorithm: str = "kmeans"
+    ) -> str:
         """
         Cluster similar Python files using machine learning.
-        
+
         Args:
             file_patterns: Glob patterns for Python files to analyze (comma-separated)
             n_clusters: Number of clusters to create (for K-means)
             algorithm: Clustering algorithm to use ("kmeans" or "dbscan")
-            
+
         Returns:
             A summary of clustering results and file similarities
         """
         # Collect files
         file_contents = {}
-        patterns = [p.strip() for p in file_patterns.split(',')]
-        
+        patterns = [p.strip() for p in file_patterns.split(",")]
+
         for pattern in patterns:
             for file_path in glob.glob(pattern, recursive=True):
-                if not file_path.endswith('.py'):
+                if not file_path.endswith(".py"):
                     continue
-                    
+
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         file_contents[file_path] = f.read()
                 except Exception:
                     continue
-        
+
         if len(file_contents) < 2:
             return "Not enough files found for clustering. Need at least 2 files."
-        
+
         # Convert files to TF-IDF vectors
-        vectorizer = TfidfVectorizer(max_features=1000,
-                                     stop_words='english',
-                                     token_pattern=r'(?u)\b[a-zA-Z_][a-zA-Z0-9_]*\b')
-        
+        vectorizer = TfidfVectorizer(
+            max_features=1000,
+            stop_words="english",
+            token_pattern=r"(?u)\b[a-zA-Z_][a-zA-Z0-9_]*\b",
+        )
+
         file_paths = list(file_contents.keys())
         content_list = list(file_contents.values())
-        
+
         try:
             vectors = vectorizer.fit_transform(content_list)
-            
+
             # Perform clustering
             clusters = {}
             cluster_method = ""
-            
+
             if algorithm.lower() == "kmeans":
                 n_clusters = min(n_clusters, len(file_contents) - 1)
                 kmeans = KMeans(n_clusters=n_clusters, random_state=42)
                 labels = kmeans.fit_predict(vectors)
                 cluster_method = f"K-means (k={n_clusters})"
-                
+
             elif algorithm.lower() == "dbscan":
                 dbscan = DBSCAN(eps=0.5, min_samples=2)
                 labels = dbscan.fit_predict(vectors)
                 cluster_method = "DBSCAN"
-                
+
             else:
                 return f"Unknown algorithm: {algorithm}. Use 'kmeans' or 'dbscan'."
-            
+
             # Organize files by cluster
             for i, file_path in enumerate(file_paths):
                 cluster_id = int(labels[i])
                 if cluster_id not in clusters:
                     clusters[cluster_id] = []
                 clusters[cluster_id].append(file_path)
-            
+
             # Format the results
             output = f"## Code Clustering Results ({cluster_method})\n\n"
             output += f"Clustered {len(file_paths)} Python files into {len(clusters)} groups:\n\n"
-            
+
             for cluster_id, files in sorted(clusters.items()):
                 if cluster_id == -1:
                     output += "### Outliers (No Clear Cluster):\n"
                 else:
                     output += f"### Cluster {cluster_id + 1}:\n"
-                    
+
                 output += f"Contains {len(files)} files:\n"
                 for file in files[:10]:
                     output += f"- {file}\n"
-                    
+
                 if len(files) > 10:
                     output += f"... and {len(files) - 10} more\n"
-                    
+
                 output += "\n"
-            
+
             return output
-            
+
         except Exception as e:
             return f"Error during clustering: {str(e)}"
 
+
 class SecurityAnalysisTool(BaseTool):
     """Tool for conducting security analysis of Python code."""
-    
+
     name: str = "Security Analysis Tool"
     description: str = """
     Analyzes Python code for security vulnerabilities using:
@@ -364,10 +398,10 @@ class SecurityAnalysisTool(BaseTool):
     def _run(self, file_patterns: str) -> str:
         """
         Analyze Python code for security vulnerabilities.
-        
+
         Args:
             file_patterns: Glob patterns for Python files to analyze (comma-separated)
-            
+
         Returns:
             A summary of security analysis results with prioritized recommendations
         """
@@ -376,33 +410,69 @@ class SecurityAnalysisTool(BaseTool):
 
         # Common security patterns to look for
         security_patterns = {
-            "hardcoded_password": (r'password\s*=\s*[\'"][^\'"]+[\'"]', "Hardcoded password", "HIGH"),
-            "sql_injection": (r'execute\([\'"].*\%.*[\'"]', "Potential SQL injection", "HIGH"),
-            "command_injection": (r'os\.system\(|subprocess\.call\(|eval\(', "Potential command injection", "HIGH"),
-            "insecure_pickle": (r'pickle\.loads\(|pickle\.load\(', "Insecure deserialization with pickle", "MEDIUM"),
-            "weak_crypto": (r'md5|SHA1', "Weak cryptographic algorithm", "MEDIUM"),
-            "logging_sensitive": (r'logging\.[a-z]+\(.*password', "Sensitive data in logs", "MEDIUM"),
-            "assert_usage": (r'^assert\s', "Assert statements can be bypassed with -O flag", "LOW"),
-            "yaml_load": (r'yaml\.load\((?!.*Loader)', "Insecure YAML loading without SafeLoader", "MEDIUM"),
-            "jwt_verify": (r'jwt\.decode\(.*verify\s*=\s*False', "JWT signature verification disabled", "HIGH"),
-            "debug_enabled": (r'DEBUG\s*=\s*True', "Debug mode enabled in production code", "LOW"),
+            "hardcoded_password": (
+                r'password\s*=\s*[\'"][^\'"]+[\'"]',
+                "Hardcoded password",
+                "HIGH",
+            ),
+            "sql_injection": (
+                r'execute\([\'"].*\%.*[\'"]',
+                "Potential SQL injection",
+                "HIGH",
+            ),
+            "command_injection": (
+                r"os\.system\(|subprocess\.call\(|eval\(",
+                "Potential command injection",
+                "HIGH",
+            ),
+            "insecure_pickle": (
+                r"pickle\.loads\(|pickle\.load\(",
+                "Insecure deserialization with pickle",
+                "MEDIUM",
+            ),
+            "weak_crypto": (r"md5|SHA1", "Weak cryptographic algorithm", "MEDIUM"),
+            "logging_sensitive": (
+                r"logging\.[a-z]+\(.*password",
+                "Sensitive data in logs",
+                "MEDIUM",
+            ),
+            "assert_usage": (
+                r"^assert\s",
+                "Assert statements can be bypassed with -O flag",
+                "LOW",
+            ),
+            "yaml_load": (
+                r"yaml\.load\((?!.*Loader)",
+                "Insecure YAML loading without SafeLoader",
+                "MEDIUM",
+            ),
+            "jwt_verify": (
+                r"jwt\.decode\(.*verify\s*=\s*False",
+                "JWT signature verification disabled",
+                "HIGH",
+            ),
+            "debug_enabled": (
+                r"DEBUG\s*=\s*True",
+                "Debug mode enabled in production code",
+                "LOW",
+            ),
         }
 
         import re
 
-        patterns = [p.strip() for p in file_patterns.split(',')]
+        patterns = [p.strip() for p in file_patterns.split(",")]
         results = []
 
         # Analyze each file
         for pattern in patterns:
             for file_path in glob.glob(pattern, recursive=True):
-                if not file_path.endswith('.py'):
+                if not file_path.endswith(".py"):
                     continue
 
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
-                        lines = content.split('\n')
+                        lines = content.split("\n")
 
                     file_issues = []
 
@@ -419,20 +489,23 @@ class SecurityAnalysisTool(BaseTool):
                             if re.search(regex, line)
                         )
                     if file_issues:
-                        results.append({
-                            "file": file_path,
-                            "issues": file_issues,
-                            "total_issues": len(file_issues)
-                        })
+                        results.append(
+                            {
+                                "file": file_path,
+                                "issues": file_issues,
+                                "total_issues": len(file_issues),
+                            }
+                        )
 
                 except Exception as e:
-                    results.append({
-                        "file": file_path,
-                        "error": str(e)
-                    })
+                    results.append({"file": file_path, "error": str(e)})
 
         # Sort results by total issues
-        sorted_results = sorted(results, key=lambda x: x.get("total_issues", 0) if "total_issues" in x else 0, reverse=True)
+        sorted_results = sorted(
+            results,
+            key=lambda x: x.get("total_issues", 0) if "total_issues" in x else 0,
+            reverse=True,
+        )
 
         # Format the results
         output = "## Security Analysis Results\n\n"
@@ -470,7 +543,9 @@ class SecurityAnalysisTool(BaseTool):
 
             # Group by severity
             for severity in ["HIGH", "MEDIUM", "LOW"]:
-                severity_issues = [i for i in result["issues"] if i["severity"] == severity]
+                severity_issues = [
+                    i for i in result["issues"] if i["severity"] == severity
+                ]
                 if not severity_issues:
                     continue
 
@@ -491,9 +566,10 @@ class SecurityAnalysisTool(BaseTool):
 
         return output
 
+
 class PerformanceAnalysisTool(BaseTool):
     """Tool for analyzing code performance."""
-    
+
     name: str = "Performance Analysis Tool"
     description: str = """
     Analyzes Python code for performance bottlenecks using:
@@ -507,60 +583,80 @@ class PerformanceAnalysisTool(BaseTool):
     def _run(self, file_patterns: str) -> str:
         """
         Analyze Python code for performance bottlenecks and anti-patterns.
-        
+
         Args:
             file_patterns: Glob patterns for Python files to analyze (comma-separated)
-            
+
         Returns:
             A summary of performance analysis with recommendations
         """
         # Performance anti-patterns to detect
         perf_patterns = {
-            "list_in_loop": (r'for .+ in .+:\s*\n\s+.+\.append\(', 
-                             "List construction in loop - consider list comprehension", 
-                             "MEDIUM"),
-            "nested_loops": (r'for .+ in .+:(?:[^\n]+\n)+?[ \t]+for .+ in .+:', 
-                            "Nested loops - potential O(n²) complexity", 
-                            "HIGH"),
-            "string_concat_loop": (r'for .+ in .+:\s*\n\s+.+\s*\+=\s*[\'"].+[\'"]', 
-                                 "String concatenation in loop - use join() instead", 
-                                 "MEDIUM"),
-            "dict_lookup_loop": (r'for .+ in .+:\s*\n\s+if\s+.+\s+in\s+.+:', 
-                                "Dictionary lookup in loop - potential O(n²) operation", 
-                                "MEDIUM"),
-            "global_var_loop": (r'global\s+.+\s*\n.+for\s+.+\s+in\s+.+:', 
-                               "Global variable modified in loop", 
-                               "LOW"),
-            "deep_copy": (r'copy\.deepcopy\(', 
-                         "Deep copy operation - can be expensive for large objects", 
-                         "LOW"),
-            "large_memory": (r'\.to_numpy\(\)|np\.array\(.*\)|\.values', 
-                            "Converting to NumPy array - potential memory issue with large data", 
-                            "MEDIUM"),
-            "pandas_apply": (r'\.apply\(', 
-                            "Pandas apply() - consider vectorized operations", 
-                            "MEDIUM"),
-            "recursive_calls": (r'def\s+([a-zA-Z0-9_]+).*\n(?:[^\n]+\n)*?[ \t]+\1\(', 
-                               "Recursive function - watch for stack overflow with deep recursion", 
-                               "LOW"),
-            "regex_in_loop": (r'for .+ in .+:\s*\n\s+re\.(search|match|findall)\(', 
-                             "Regular expression in loop - compile outside loop", 
-                             "MEDIUM"),
+            "list_in_loop": (
+                r"for .+ in .+:\s*\n\s+.+\.append\(",
+                "List construction in loop - consider list comprehension",
+                "MEDIUM",
+            ),
+            "nested_loops": (
+                r"for .+ in .+:(?:[^\n]+\n)+?[ \t]+for .+ in .+:",
+                "Nested loops - potential O(n²) complexity",
+                "HIGH",
+            ),
+            "string_concat_loop": (
+                r'for .+ in .+:\s*\n\s+.+\s*\+=\s*[\'"].+[\'"]',
+                "String concatenation in loop - use join() instead",
+                "MEDIUM",
+            ),
+            "dict_lookup_loop": (
+                r"for .+ in .+:\s*\n\s+if\s+.+\s+in\s+.+:",
+                "Dictionary lookup in loop - potential O(n²) operation",
+                "MEDIUM",
+            ),
+            "global_var_loop": (
+                r"global\s+.+\s*\n.+for\s+.+\s+in\s+.+:",
+                "Global variable modified in loop",
+                "LOW",
+            ),
+            "deep_copy": (
+                r"copy\.deepcopy\(",
+                "Deep copy operation - can be expensive for large objects",
+                "LOW",
+            ),
+            "large_memory": (
+                r"\.to_numpy\(\)|np\.array\(.*\)|\.values",
+                "Converting to NumPy array - potential memory issue with large data",
+                "MEDIUM",
+            ),
+            "pandas_apply": (
+                r"\.apply\(",
+                "Pandas apply() - consider vectorized operations",
+                "MEDIUM",
+            ),
+            "recursive_calls": (
+                r"def\s+([a-zA-Z0-9_]+).*\n(?:[^\n]+\n)*?[ \t]+\1\(",
+                "Recursive function - watch for stack overflow with deep recursion",
+                "LOW",
+            ),
+            "regex_in_loop": (
+                r"for .+ in .+:\s*\n\s+re\.(search|match|findall)\(",
+                "Regular expression in loop - compile outside loop",
+                "MEDIUM",
+            ),
         }
 
         import re
 
-        patterns = [p.strip() for p in file_patterns.split(',')]
+        patterns = [p.strip() for p in file_patterns.split(",")]
         results = []
 
         # Analyze each file
         for pattern in patterns:
             for file_path in glob.glob(pattern, recursive=True):
-                if not file_path.endswith('.py'):
+                if not file_path.endswith(".py"):
                     continue
 
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     file_issues = []
@@ -569,17 +665,19 @@ class PerformanceAnalysisTool(BaseTool):
                     for regex, description, severity in perf_patterns.values():
                         matches = re.finditer(regex, content, re.MULTILINE)
                         for match in matches:
-                            line_no = content[:match.start()].count('\n') + 1
-                            context = content[match.start():match.end()].strip()
+                            line_no = content[: match.start()].count("\n") + 1
+                            context = content[match.start() : match.end()].strip()
                             if len(context) > 100:
                                 context = context[:97] + "..."
 
-                            file_issues.append({
-                                "issue": description,
-                                "severity": severity,
-                                "line": line_no,
-                                "context": context,
-                            })
+                            file_issues.append(
+                                {
+                                    "issue": description,
+                                    "severity": severity,
+                                    "line": line_no,
+                                    "context": context,
+                                }
+                            )
 
                     # Check for large functions (high cyclomatic complexity)
                     try:
@@ -600,20 +698,23 @@ class PerformanceAnalysisTool(BaseTool):
                         pass
 
                     if file_issues:
-                        results.append({
-                            "file": file_path,
-                            "issues": file_issues,
-                            "total_issues": len(file_issues)
-                        })
+                        results.append(
+                            {
+                                "file": file_path,
+                                "issues": file_issues,
+                                "total_issues": len(file_issues),
+                            }
+                        )
 
                 except Exception as e:
-                    results.append({
-                        "file": file_path,
-                        "error": str(e)
-                    })
+                    results.append({"file": file_path, "error": str(e)})
 
         # Sort results by total issues
-        sorted_results = sorted(results, key=lambda x: x.get("total_issues", 0) if "total_issues" in x else 0, reverse=True)
+        sorted_results = sorted(
+            results,
+            key=lambda x: x.get("total_issues", 0) if "total_issues" in x else 0,
+            reverse=True,
+        )
 
         # Format the results
         output = "## Performance Analysis Results\n\n"
@@ -651,7 +752,9 @@ class PerformanceAnalysisTool(BaseTool):
 
             # Group by severity
             for severity in ["HIGH", "MEDIUM", "LOW"]:
-                severity_issues = [i for i in result["issues"] if i["severity"] == severity]
+                severity_issues = [
+                    i for i in result["issues"] if i["severity"] == severity
+                ]
                 if not severity_issues:
                     continue
 
@@ -673,16 +776,23 @@ class PerformanceAnalysisTool(BaseTool):
             output += "- **Fine-tuning**: Consider minor optimizations when working on the affected code\n"
 
         output += "\n### General Performance Best Practices\n"
-        output += "- Use list/dict comprehensions instead of building collections in loops\n"
-        output += "- Replace nested loops with more efficient data structures when possible\n"
+        output += (
+            "- Use list/dict comprehensions instead of building collections in loops\n"
+        )
+        output += (
+            "- Replace nested loops with more efficient data structures when possible\n"
+        )
         output += "- Consider NumPy vectorized operations for numerical processing\n"
-        output += "- Profile your code to identify actual bottlenecks before optimizing\n"
+        output += (
+            "- Profile your code to identify actual bottlenecks before optimizing\n"
+        )
 
         return output
 
+
 class DocumentationAnalysisTool(BaseTool):
     """Tool for analyzing and improving code documentation."""
-    
+
     name: str = "Documentation Analysis Tool"
     description: str = """
     Analyzes Python code documentation quality using NLP techniques:
@@ -696,14 +806,14 @@ class DocumentationAnalysisTool(BaseTool):
     def _run(self, file_patterns: str) -> str:
         """
         Analyze documentation quality in Python files.
-        
+
         Args:
             file_patterns: Glob patterns for Python files to analyze (comma-separated)
-            
+
         Returns:
             A summary of documentation analysis with improvement suggestions
         """
-        patterns = [p.strip() for p in file_patterns.split(',')]
+        patterns = [p.strip() for p in file_patterns.split(",")]
         results = []
 
         class NodeVisitor(ast.NodeVisitor):
@@ -728,26 +838,40 @@ class DocumentationAnalysisTool(BaseTool):
             for node in ast.walk(tree):
                 if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef)):
                     # Check for module docstring
-                    if isinstance(node, ast.Module) and node.body and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Str):
+                    if (
+                        isinstance(node, ast.Module)
+                        and node.body
+                        and isinstance(node.body[0], ast.Expr)
+                        and isinstance(node.body[0].value, ast.Str)
+                    ):
                         docstrings.append(("module", node.body[0].value.s))
 
                     # Check for class/function docstring
-                    elif hasattr(node, 'body') and node.body and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Str):
+                    elif (
+                        hasattr(node, "body")
+                        and node.body
+                        and isinstance(node.body[0], ast.Expr)
+                        and isinstance(node.body[0].value, ast.Str)
+                    ):
                         if isinstance(node, ast.ClassDef):
-                            docstrings.append(("class", node.name, node.body[0].value.s))
+                            docstrings.append(
+                                ("class", node.name, node.body[0].value.s)
+                            )
                         elif isinstance(node, ast.FunctionDef):
-                            docstrings.append(("function", node.name, node.body[0].value.s))
+                            docstrings.append(
+                                ("function", node.name, node.body[0].value.s)
+                            )
 
             return docstrings, parent_map
 
         # Analyze each file
         for pattern in patterns:
             for file_path in glob.glob(pattern, recursive=True):
-                if not file_path.endswith('.py'):
+                if not file_path.endswith(".py"):
                     continue
 
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     # Parse the AST
@@ -767,13 +891,18 @@ class DocumentationAnalysisTool(BaseTool):
                             classes.append(node)
                         elif isinstance(node, ast.FunctionDef):
                             # Only capture top-level functions (parent is Module)
-                            if node in parent_map and isinstance(parent_map[node], ast.Module):
+                            if node in parent_map and isinstance(
+                                parent_map[node], ast.Module
+                            ):
                                 functions.append(node)
-                        elif (isinstance(node, ast.Expr) and 
-                              isinstance(node.value, ast.Str) and
-                              node in parent_map and
-                              isinstance(parent_map[node], ast.Module) and
-                              parent_map[node].body and parent_map[node].body[0] == node):
+                        elif (
+                            isinstance(node, ast.Expr)
+                            and isinstance(node.value, ast.Str)
+                            and node in parent_map
+                            and isinstance(parent_map[node], ast.Module)
+                            and parent_map[node].body
+                            and parent_map[node].body[0] == node
+                        ):
                             module_docstring = node.value.s
 
                     # Analyze documentation quality
@@ -781,63 +910,81 @@ class DocumentationAnalysisTool(BaseTool):
 
                     # Check module docstring
                     if not module_docstring:
-                        doc_issues.append({
-                            "type": "missing",
-                            "element": "module",
-                            "name": os.path.basename(file_path),
-                            "issue": "Missing module-level docstring"
-                        })
+                        doc_issues.append(
+                            {
+                                "type": "missing",
+                                "element": "module",
+                                "name": os.path.basename(file_path),
+                                "issue": "Missing module-level docstring",
+                            }
+                        )
 
                     # Check class and function docstrings
                     documented_elements = {}
-                    for doc_type, name, docstring in [d for d in docstrings if len(d) == 3]:
+                    for doc_type, name, docstring in [
+                        d for d in docstrings if len(d) == 3
+                    ]:
                         documented_elements[(doc_type, name)] = docstring
 
                         # Check docstring quality
                         if len(docstring.strip()) < 10:
-                            doc_issues.append({
-                                "type": "poor",
-                                "element": doc_type,
-                                "name": name,
-                                "issue": f"Very short {doc_type} docstring (less than 10 chars)"
-                            })
+                            doc_issues.append(
+                                {
+                                    "type": "poor",
+                                    "element": doc_type,
+                                    "name": name,
+                                    "issue": f"Very short {doc_type} docstring (less than 10 chars)",
+                                }
+                            )
 
                         # Check if parameters are documented (for functions)
-                        if doc_type == "function" and "param" not in docstring and "parameter" not in docstring.lower():
-                            doc_issues.append({
-                                "type": "incomplete",
-                                "element": "function",
-                                "name": name,
-                                "issue": "No parameter documentation found in docstring"
-                            })
+                        if (
+                            doc_type == "function"
+                            and "param" not in docstring
+                            and "parameter" not in docstring.lower()
+                        ):
+                            doc_issues.append(
+                                {
+                                    "type": "incomplete",
+                                    "element": "function",
+                                    "name": name,
+                                    "issue": "No parameter documentation found in docstring",
+                                }
+                            )
 
                         # Check if return value is documented (for functions)
                         if doc_type == "function" and "return" not in docstring.lower():
-                            doc_issues.append({
-                                "type": "incomplete",
-                                "element": "function",
-                                "name": name,
-                                "issue": "No return value documentation found in docstring"
-                            })
+                            doc_issues.append(
+                                {
+                                    "type": "incomplete",
+                                    "element": "function",
+                                    "name": name,
+                                    "issue": "No return value documentation found in docstring",
+                                }
+                            )
 
                     # Check for missing docstrings
                     for cls in classes:
                         if ("class", cls.name) not in documented_elements:
-                            doc_issues.append({
-                                "type": "missing",
-                                "element": "class",
-                                "name": cls.name,
-                                "issue": "Missing class docstring"
-                            })
+                            doc_issues.append(
+                                {
+                                    "type": "missing",
+                                    "element": "class",
+                                    "name": cls.name,
+                                    "issue": "Missing class docstring",
+                                }
+                            )
 
                     for func in functions:
                         if ("function", func.name) not in documented_elements:
-                            doc_issues.append({
-                                "type": "missing",
-                                "element": "function",
-                                "name": func.name,
-                                "issue": "Missing function docstring"
-                            })
+                            doc_issues.append(
+                                {
+                                    "type": "missing",
+                                    "element": "function",
+                                    "name": func.name,
+                                    "issue": "Missing function docstring",
+                                }
+                            )
 
                     if doc_issues:
                         results.append(
@@ -848,12 +995,10 @@ class DocumentationAnalysisTool(BaseTool):
                                     "total_classes": len(classes),
                                     "total_functions": len(functions),
                                     "documented_classes": sum(
-                                        k[0] == "class"
-                                        for k in documented_elements
+                                        k[0] == "class" for k in documented_elements
                                     ),
                                     "documented_functions": sum(
-                                        k[0] == "function"
-                                        for k in documented_elements
+                                        k[0] == "function" for k in documented_elements
                                     ),
                                     "has_module_docstring": module_docstring
                                     is not None,
@@ -862,10 +1007,7 @@ class DocumentationAnalysisTool(BaseTool):
                         )
 
                 except Exception as e:
-                    results.append({
-                        "file": file_path,
-                        "error": str(e)
-                    })
+                    results.append({"file": file_path, "error": str(e)})
 
         # Format the results
         output = "## Documentation Analysis Results\n\n"
@@ -878,22 +1020,37 @@ class DocumentationAnalysisTool(BaseTool):
         output += f"Analyzed {len(results)} Python files. Found documentation issues in {len(issue_files)} files.\n\n"
 
         # Calculate overall statistics
-        total_classes = sum(r["stats"]["total_classes"] for r in results if "stats" in r)
-        total_functions = sum(r["stats"]["total_functions"] for r in results if "stats" in r)
-        documented_classes = sum(r["stats"]["documented_classes"] for r in results if "stats" in r)
-        documented_functions = sum(r["stats"]["documented_functions"] for r in results if "stats" in r)
-        files_with_module_docs = sum(bool("stats" in r and r["stats"]["has_module_docstring"])
-                                 for r in results)
+        total_classes = sum(
+            r["stats"]["total_classes"] for r in results if "stats" in r
+        )
+        total_functions = sum(
+            r["stats"]["total_functions"] for r in results if "stats" in r
+        )
+        documented_classes = sum(
+            r["stats"]["documented_classes"] for r in results if "stats" in r
+        )
+        documented_functions = sum(
+            r["stats"]["documented_functions"] for r in results if "stats" in r
+        )
+        files_with_module_docs = sum(
+            bool("stats" in r and r["stats"]["has_module_docstring"]) for r in results
+        )
 
         output += "### Overall Documentation Statistics\n"
-        output += f"- Files with module docstrings: {files_with_module_docs}/{len(results)} ({files_with_module_docs/len(results)*100:.1f}%)\n"
-        output += f"- Classes with docstrings: {documented_classes}/{total_classes} ({documented_classes/total_classes*100:.1f}% if total_classes > 0 else 'N/A')\n"
-        output += f"- Functions with docstrings: {documented_functions}/{total_functions} ({documented_functions/total_functions*100:.1f}% if total_functions > 0 else 'N/A')\n\n"
+        output += f"- Files with module docstrings: {files_with_module_docs}/{len(results)} ({files_with_module_docs / len(results) * 100:.1f}%)\n"
+        output += f"- Classes with docstrings: {documented_classes}/{total_classes} ({documented_classes / total_classes * 100:.1f}% if total_classes > 0 else 'N/A')\n"
+        output += f"- Functions with docstrings: {documented_functions}/{total_functions} ({documented_functions / total_functions * 100:.1f}% if total_functions > 0 else 'N/A')\n\n"
 
         # Group issues by type
-        missing_count = sum(1 for r in issue_files for i in r["issues"] if i["type"] == "missing")
-        poor_count = sum(1 for r in issue_files for i in r["issues"] if i["type"] == "poor")
-        incomplete_count = sum(1 for r in issue_files for i in r["issues"] if i["type"] == "incomplete")
+        missing_count = sum(
+            1 for r in issue_files for i in r["issues"] if i["type"] == "missing"
+        )
+        poor_count = sum(
+            1 for r in issue_files for i in r["issues"] if i["type"] == "poor"
+        )
+        incomplete_count = sum(
+            1 for r in issue_files for i in r["issues"] if i["type"] == "incomplete"
+        )
 
         output += "### Issue Summary\n"
         output += f"- Missing docstrings: {missing_count}\n"
@@ -901,7 +1058,9 @@ class DocumentationAnalysisTool(BaseTool):
         output += f"- Incomplete docstrings: {incomplete_count}\n\n"
 
         # Show detailed results for files with issues
-        sorted_results = sorted(issue_files, key=lambda x: len(x["issues"]), reverse=True)
+        sorted_results = sorted(
+            issue_files, key=lambda x: len(x["issues"]), reverse=True
+        )
 
         for result in sorted_results[:5]:
             output += f"### {result['file']}\n"
@@ -918,7 +1077,9 @@ class DocumentationAnalysisTool(BaseTool):
             # Group by issue type
             missing_issues = [i for i in result["issues"] if i["type"] == "missing"]
             poor_issues = [i for i in result["issues"] if i["type"] == "poor"]
-            incomplete_issues = [i for i in result["issues"] if i["type"] == "incomplete"]
+            incomplete_issues = [
+                i for i in result["issues"] if i["type"] == "incomplete"
+            ]
 
             if missing_issues:
                 output += "#### Missing Docstrings:\n"
@@ -941,9 +1102,11 @@ class DocumentationAnalysisTool(BaseTool):
         # Add recommendations
         output += "### Documentation Improvement Recommendations\n"
         output += "1. Add module-level docstrings to all Python files to describe their purpose\n"
-        output += "2. Document all public classes and functions with descriptive docstrings\n"
+        output += (
+            "2. Document all public classes and functions with descriptive docstrings\n"
+        )
         output += "3. Include parameter descriptions and return value information in function docstrings\n"
         output += "4. Use consistent docstring format (Google style, NumPy style, or reStructuredText)\n"
         output += "5. Consider using tools like Sphinx to generate documentation from docstrings\n"
 
-        return output 
+        return output

@@ -26,8 +26,7 @@ class FFMModel:
 
         # Initialize model parameters w: n x f x k tensor
         # Samples from U(0, 1/sqrt(k)) [cite: 82]
-        self.w = np.random.uniform(0, 1.0 / math.sqrt(self.k),
-                                   (self.n, self.f, self.k))
+        self.w = np.random.uniform(0, 1.0 / math.sqrt(self.k), (self.n, self.f, self.k))
 
         # Initialize sum of squared gradients G: n x f x k tensor
         # Initialized to ones [cite: 80, 83]
@@ -53,8 +52,12 @@ class FFMModel:
 
                 # Get relevant latent vectors w_j1,f2 and w_j2,f1
                 # Ensure indices are within bounds
-                if 0 <= j1 < self.n and 0 <= f2 < self.f and \
-                       0 <= j2 < self.n and 0 <= f1 < self.f:
+                if (
+                    0 <= j1 < self.n
+                    and 0 <= f2 < self.f
+                    and 0 <= j2 < self.n
+                    and 0 <= f1 < self.f
+                ):
                     w_j1_f2 = self.w[j1, f2, :]
                     w_j2_f1 = self.w[j2, f1, :]
 
@@ -74,12 +77,12 @@ class FFMModel:
         """
         for epoch in range(self.n_epochs):
             print(f"Starting Epoch {epoch + 1}/{self.n_epochs}")
-            random.shuffle(S_sparse) # Process data in random order
+            random.shuffle(S_sparse)  # Process data in random order
 
             for y, x_sparse in S_sparse:
                 # Ensure label y is typically -1 or 1 for this loss formulation
                 if y == 0:
-                    y = -1 # Convert 0/1 labels if needed
+                    y = -1  # Convert 0/1 labels if needed
 
                 # 1. Calculate phi [cite: 73]
                 phi = self.predict_phi(x_sparse)
@@ -97,8 +100,12 @@ class FFMModel:
                         f2, j2, v2 = x_sparse[j]
 
                         # Ensure indices are within bounds before accessing w and G
-                        if not (0 <= j1 < self.n and 0 <= f2 < self.f and \
-                                0 <= j2 < self.n and 0 <= f1 < self.f):
+                        if not (
+                            0 <= j1 < self.n
+                            and 0 <= f2 < self.f
+                            and 0 <= j2 < self.n
+                            and 0 <= f1 < self.f
+                        ):
                             # print(f"Warning: Skipping update due to out-of-bounds index - j1:{j1}, f2:{f2} or j2:{j2}, f1:{f1}")
                             continue
 
@@ -110,11 +117,15 @@ class FFMModel:
                         g_j2_f1 = self.lambda_reg * w_j2_f1 + kappa * w_j1_f2 * v1 * v2
 
                         # 5. Update G and w for each dimension d [cite: 80, 81]
-                        self.G[j1, f2, :] += g_j1_f2 ** 2
-                        self.G[j2, f1, :] += g_j2_f1 ** 2
+                        self.G[j1, f2, :] += g_j1_f2**2
+                        self.G[j2, f1, :] += g_j2_f1**2
 
-                        self.w[j1, f2, :] -= (self.eta / np.sqrt(self.G[j1, f2, :])) * g_j1_f2
-                        self.w[j2, f1, :] -= (self.eta / np.sqrt(self.G[j2, f1, :])) * g_j2_f1
+                        self.w[j1, f2, :] -= (
+                            self.eta / np.sqrt(self.G[j1, f2, :])
+                        ) * g_j1_f2
+                        self.w[j2, f1, :] -= (
+                            self.eta / np.sqrt(self.G[j2, f1, :])
+                        ) * g_j2_f1
 
             # Optional: Calculate loss on validation set for early stopping here
             print(f"Epoch {epoch + 1} completed.")
@@ -123,14 +134,14 @@ class FFMModel:
 
 
 # --- Example Usage ---
-if __name__ == '__main__':
+if __name__ == "__main__":
     # --- Parameters ---
     N_FEATURES = 1000  # Example: Total unique features after hashing/encoding
-    N_FIELDS = 10      # Example: Number of distinct fields
-    K_FACTORS = 4      # Example: Number of latent factors [cite: 202] (Value from paper)
-    ETA = 0.1          # Example: Learning rate [cite: 160] (Value from paper experiments)
+    N_FIELDS = 10  # Example: Number of distinct fields
+    K_FACTORS = 4  # Example: Number of latent factors [cite: 202] (Value from paper)
+    ETA = 0.1  # Example: Learning rate [cite: 160] (Value from paper experiments)
     LAMBDA_REG = 2e-5  # Example: Regularization [cite: 202] (Value from paper)
-    N_EPOCHS = 10      # Example: Number of epochs [cite: 80] (Adjust as needed)
+    N_EPOCHS = 10  # Example: Number of epochs [cite: 80] (Adjust as needed)
 
     # --- Generate Synthetic Sparse Data ---
     # Format: [(y, [(field_idx, feature_idx, value), ...]), ...]
@@ -139,7 +150,7 @@ if __name__ == '__main__':
     MAX_NON_ZERO_PER_INSTANCE = 15
     train_data_sparse = []
     for _ in range(DATA_SIZE):
-        y_label = random.choice([-1, 1]) # Use -1/1 for logistic loss
+        y_label = random.choice([-1, 1])  # Use -1/1 for logistic loss
         num_non_zero = random.randint(5, MAX_NON_ZERO_PER_INSTANCE)
         x_instance_sparse = []
         used_features = set()
@@ -148,7 +159,7 @@ if __name__ == '__main__':
             # Ensure unique feature index per instance for simplicity here
             feature = random.randint(0, N_FEATURES - 1)
             while feature in used_features:
-                 feature = random.randint(0, N_FEATURES - 1)
+                feature = random.randint(0, N_FEATURES - 1)
             used_features.add(feature)
 
             # Often values are 1 for categorical features after one-hot encoding
@@ -157,7 +168,9 @@ if __name__ == '__main__':
         train_data_sparse.append((y_label, x_instance_sparse))
 
     print(f"Generated {len(train_data_sparse)} training instances.")
-    print(f"Example instance: y={train_data_sparse[0][0]}, x={train_data_sparse[0][1][:3]}...") # Show first 3 features
+    print(
+        f"Example instance: y={train_data_sparse[0][0]}, x={train_data_sparse[0][1][:3]}..."
+    )  # Show first 3 features
 
     # --- Initialize and Train ---
     ffm = FFMModel(N_FEATURES, N_FIELDS, K_FACTORS, ETA, LAMBDA_REG, N_EPOCHS)

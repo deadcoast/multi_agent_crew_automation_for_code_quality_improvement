@@ -18,6 +18,25 @@ Next, navigate to your project directory and install the dependencies:
 ```bash
 crewai install
 ```
+
+### Algorithm Dependencies
+
+This project uses several specialized algorithms that require additional dependencies. Install them using pip:
+
+```bash
+# Core dependencies
+pip install numpy scikit-learn matplotlib
+pip install networkx>=3.0  # Version 3.0+ required to avoid bugs
+
+# Machine learning algorithms
+pip install hpelm minisom pyTsetlinMachine gplearn 
+
+# Optimization and analysis tools
+pip install bayesian-optimization sklearn-crfsuite
+```
+
+Note: Some algorithms may have platform-specific requirements. Please check the documentation of each individual package for detailed installation instructions.
+
 ### Customizing
 
 **Add your `OPENAI_API_KEY` into the `.env` file**

@@ -16,7 +16,7 @@ X = np.vstack([X, X_outliers])
 iso_forest = IsolationForest(n_estimators=100, contamination="auto", random_state=42)
 y_pred = iso_forest.fit_predict(X)
 
-plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='coolwarm', edgecolors='k')
+plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap="coolwarm", edgecolors="k")
 plt.xlabel("Feature 1")
 plt.ylabel("Feature 2")
 plt.title("Isolation Forest Anomaly Detection")

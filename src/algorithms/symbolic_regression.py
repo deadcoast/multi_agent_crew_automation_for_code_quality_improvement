@@ -14,8 +14,7 @@ def xicor(x, y, ties="auto"):
         ties = len(np.unique(y)) < n
     elif not isinstance(ties, bool):
         raise ValueError(
-            f'expected ties either "auto" or boolean, '
-            f"got {ties} ({type(ties)}) instead"
+            f'expected ties either "auto" or boolean, got {ties} ({type(ties)}) instead'
         )
 
     y = y[np.argsort(x)]
